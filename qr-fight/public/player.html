@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>QR Fight - Player</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; text-align: center; }
+    .hud { padding: 16px; }
+    #video { width: 100%; max-height: 45vh; object-fit: cover; background: #1e293b; border-bottom: 2px solid #334155; }
+    .badge { display: inline-block; padding: 8px 18px; border-radius: 20px; font-weight: 800; font-size: 16px; margin: 10px 0; }
+    .scoring { background: #22c55e; color: #000; animation: pulse 1s infinite alternate; }
+    .off { background: #ef4444; color: #fff; }
+    .wrong { background: #f59e0b; color: #000; }
+    select, button { padding: 12px 18px; font-size: 16px; border-radius: 10px; border: none; font-weight: bold; margin: 6px; }
+    button { background: #38bdf8; color: #0f172a; cursor: pointer; }
+    @keyframes pulse { from { opacity: 0.85; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h2>QR FIGHT: PLAYER</h2>
+    <div>
+      <select id="teamSelect">
+        <option value="teamA">Team A (Cyan)</option>
+        <option value="teamB">Team B (Orange)</option>
+      </select>
+      <button id="startBtn">Enable Camera</button>
+    </div>
+
+    <div>
+      <span id="badge" class="badge off">Aim at Your QR</span>
+    </div>
+
+    <h1 id="scoreDisplay" style="margin: 5px 0; font-size: 42px;">0 / 2000</h1>
+    <p id="infoText" style="color: #94a3b8; margin: 0;">Select your team and activate camera</p>
+  </div>
+
+  <video id="video" playsinline></video>
+  <canvas id="canvas" hidden></canvas>
+
+  <script>
+    const socket = io();
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const badge = document.getElementById('badge');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const infoText = document.getElementById('infoText');
+    const teamSelect = document.getElementById('teamSelect');
+
+    let selectedTeam = 'teamA';
+    let cameraActive = false;
+
+    const teamTokens = {
+      teamA: 'FIGHT_TARGET_TEAM_A',
+      teamB: 'FIGHT_TARGET_TEAM_B'
+    };
+
+    teamSelect.addEventListener('change', (e) => {
+      selectedTeam = e.target.value;
+      updateHudLabel();
+    });
+
+    function updateHudLabel() {
+      infoText.innerText = selectedTeam === 'teamA' 
+        ? 'Scan QR Code A only!' 
+        : 'Scan QR Code B only!';
+    }
+    updateHudLabel();
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        video.srcObject = stream;
+        await video.play();
+        cameraActive = true;
+        document.getElementById('startBtn').style.display = 'none';
+        teamSelect.disabled = true;
+        scanLoop();
+      } catch (err) {
+        alert('Camera permission denied or camera not supported.');
+      }
+    });
+
+    function scanLoop() {
+      if (!cameraActive) return;
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height);
+
+        if (code && code.data) {
+          socket.emit('scanPing', {
+            team: selectedTeam,
+            detected: true,
+            codeData: code.data
+          });
+        } else {
+          socket.emit('scanPing', {
+            team: selectedTeam,
+            detected: false,
+            codeData: null
+          });
+        }
+      }
+      setTimeout(scanLoop, 80);
+    }
+
+    socket.on('stateUpdate', (state) => {
+      const myTeam = state.teams[selectedTeam];
+      scoreDisplay.innerText = `${myTeam.score} / 2000`;
+
+      if (state.status === 'ENDED') {
+        badge.className = 'badge off';
+        badge.innerText = state.winner === (selectedTeam === 'teamA' ? 'Team A' : 'Team B')
+          ? '🎉 VICTORY!'
+          : 'DEFEAT';
+      } else if (state.status === 'PAUSED') {
+        badge.className = 'badge off';
+        badge.innerText = 'PAUSED';
+      } else if (myTeam.isScanning) {
+        badge.className = 'badge scoring';
+        badge.innerText = '⚡ SCORING ACTIVE';
+      } else {
+        badge.className = 'badge off';
+        badge.innerText = 'OFF TARGET';
+      }
+    });
+  </script>
+</body>
+</html>

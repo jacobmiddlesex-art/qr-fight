@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Fight - Live Arena</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 40px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      background: #09090b;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .banner { font-size: 34px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 24px; }
+    .target-tag { color: #a1a1aa; font-size: 18px; margin-bottom: 30px; }
+    .arena { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; width: 100%; max-width: 950px; }
+    .card {
+      background: #18181b;
+      padding: 30px;
+      border-radius: 20px;
+      border: 3px solid #27272a;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+    .card-a.active { border-color: #38bdf8; box-shadow: 0 0 35px rgba(56, 189, 248, 0.4); }
+    .card-b.active { border-color: #fb923c; box-shadow: 0 0 35px rgba(251, 146, 60, 0.4); }
+    .score { font-size: 84px; font-weight: 900; margin: 10px 0; }
+    .meter { height: 32px; background: #27272a; border-radius: 16px; overflow: hidden; margin-top: 20px; }
+    .fill { height: 100%; width: 0%; transition: width 0.1s linear; }
+    .fill-a { background: #38bdf8; }
+    .fill-b { background: #fb923c; }
+    .status { margin-top: 15px; font-size: 18px; font-weight: bold; color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <div class="banner" id="banner">WAITING FOR HOST</div>
+  <div class="target-tag">FIRST TO REACH 2000 WINS</div>
+
+  <div class="arena">
+    <div class="card card-a" id="cardA">
+      <h2 style="color: #38bdf8; margin: 0;">TEAM A</h2>
+      <div class="score" id="scoreA">0</div>
+      <div class="meter"><div class="fill fill-a" id="fillA"></div></div>
+      <div class="status" id="statusA">OFF TARGET</div>
+    </div>
+
+    <div class="card card-b" id="cardB">
+      <h2 style="color: #fb923c; margin: 0;">TEAM B</h2>
+      <div class="score" id="scoreB">0</div>
+      <div class="meter"><div class="fill fill-b" id="fillB"></div></div>
+      <div class="status" id="statusB">OFF TARGET</div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+
+    socket.on('stateUpdate', (state) => {
+      const a = state.teams.teamA;
+      const b = state.teams.teamB;
+
+      document.getElementById('scoreA').innerText = a.score;
+      document.getElementById('scoreB').innerText = b.score;
+
+      document.getElementById('fillA').style.width = Math.min(100, (a.score / 2000) * 100) + '%';
+      document.getElementById('fillB').style.width = Math.min(100, (b.score / 2000) * 100) + '%';
+
+      if (state.status === 'ENDED') {
+        document.getElementById('banner').innerText = `🏆 ${state.winner.toUpperCase()} VICTORY!`;
+      } else {
+        document.getElementById('banner').innerText = `GAME ${state.status}`;
+      }
+
+      // Independent visual indicators
+      const cardA = document.getElementById('cardA');
+      const cardB = document.getElementById('cardB');
+
+      if (a.isScanning && state.status === 'PLAYING') {
+        cardA.classList.add('active');
+        document.getElementById('statusA').innerText = 'SCORING... ⚡';
+        document.getElementById('statusA').style.color = '#38bdf8';
+      } else {
+        cardA.classList.remove('active');
+        document.getElementById('statusA').innerText = 'OFF TARGET';
+        document.getElementById('statusA').style.color = '#a1a1aa';
+      }
+
+      if (b.isScanning && state.status === 'PLAYING') {
+        cardB.classList.add('active');
+        document.getElementById('statusB').innerText = 'SCORING... ⚡';
+        document.getElementById('statusB').style.color = '#fb923c';
+      } else {
+        cardB.classList.remove('active');
+        document.getElementById('statusB').innerText = 'OFF TARGET';
+        document.getElementById('statusB').style.color = '#a1a1aa';
+      }
+    });
+  </script>
+</body>
+</html>

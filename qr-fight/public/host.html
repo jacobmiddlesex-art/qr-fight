@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Fight - Host Control</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b1120; color: #f8fafc; text-align: center; margin: 0; padding: 24px; }
+    .btn { font-size: 18px; padding: 12px 24px; margin: 6px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+    .btn-green { background: #22c55e; color: #000; }
+    .btn-amber { background: #f59e0b; color: #000; }
+    .btn-red { background: #ef4444; color: #fff; }
+    .qr-arena { display: flex; justify-content: center; gap: 40px; margin-top: 30px; flex-wrap: wrap; }
+    .qr-box { background: #1e293b; padding: 24px; border-radius: 16px; border: 2px solid #334155; }
+    .qr-card { background: #ffffff; padding: 16px; border-radius: 12px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>QR FIGHT: HOST MASTER</h1>
+
+  <div>
+    <button class="btn btn-green" onclick="sendCmd('START')">Start / Resume</button>
+    <button class="btn btn-amber" onclick="sendCmd('PAUSE')">Pause</button>
+    <button class="btn btn-red" onclick="sendCmd('RESTART')">Reset Game</button>
+  </div>
+
+  <h2 id="statusDisplay">Status: IDLE</h2>
+
+  <div class="qr-arena">
+    <div class="qr-box">
+      <h2 style="color: #38bdf8; margin-top: 0;">TEAM A TARGET</h2>
+      <div class="qr-card" id="qrA"></div>
+      <p style="color: #94a3b8; font-weight: bold; margin-bottom: 0;">Code: TARGET A</p>
+    </div>
+
+    <div class="qr-box">
+      <h2 style="color: #fb923c; margin-top: 0;">TEAM B TARGET</h2>
+      <div class="qr-card" id="qrB"></div>
+      <p style="color: #94a3b8; font-weight: bold; margin-bottom: 0;">Code: TARGET B</p>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+
+    new QRCode(document.getElementById("qrA"), {
+      text: "FIGHT_TARGET_TEAM_A",
+      width: 220,
+      height: 220
+    });
+
+    new QRCode(document.getElementById("qrB"), {
+      text: "FIGHT_TARGET_TEAM_B",
+      width: 220,
+      height: 220
+    });
+
+    function sendCmd(action) {
+      socket.emit('hostCommand', action);
+    }
+
+    socket.on('stateUpdate', (state) => {
+      document.getElementById('statusDisplay').innerText = 
+        `Game: ${state.status} | Team A: ${state.teams.teamA.score} | Team B: ${state.teams.teamB.score}`;
+    });
+  </script>
+</body>
+</html>
